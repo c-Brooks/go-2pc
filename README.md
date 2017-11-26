@@ -1,8 +1,6 @@
-# zookeeper-demo
+# go-2pc
 
-A demo showing how to use Apache ZooKeeper to manage a distributed system.
-
-Hosted using Kubernetes.
+WIP - A simple implementation of Two-Phase Commit protocol.
 
 ## Slides
 
