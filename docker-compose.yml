@@ -1,0 +1,118 @@
+version: '3.3'
+
+services:
+
+  # CONSUL
+  # this service handles service discovery for peer-to-peer connections
+  # it's important to do it this way: this allows every node to start a gRPC server
+  # and become a master at a moment's notice
+  consul:
+    container_name: consul
+    image: consul:1.0.1
+
+    command: consul agent -dev -client 0.0.0.0
+    ports:
+      - "8500:8500"     # HTTP API
+      - "8600:8600/udp" # DNS API
+
+    expose:
+    - 53
+    - 8300
+    - 8301
+    - 8302
+    - 8400
+    - 8500
+
+  master:
+    image: demo
+    build: .
+
+    command: go run main.go --master
+    volumes:
+      - ./:/go/src/github.com/c-Brooks/go-2pc
+
+    ports:
+    - 8080:8080
+
+    depends_on:
+    - consul
+    external_links:
+    - consul
+
+    environment:
+    - CONSUL_ADDRESS=consul:8500
+
+  replica_1:
+    image: demo
+    build: .
+
+    command: go run main.go
+    volumes:
+      - ./:/go/src/github.com/c-Brooks/go-2pc
+    links:
+    - master
+    environment:
+    - master_addr=master
+    - CONSUL_ADDRESS=consul:8500
+
+    depends_on:
+    - consul
+    links:
+    - consul
+
+
+  replica_2:
+    image: demo
+    build: .
+
+    command: go run main.go
+    volumes:
+    - ./:/go/src/github.com/c-Brooks/go-2pc 
+    links:
+    - master
+    environment:
+    - master_addr=master
+    - CONSUL_ADDRESS=consul:8500
+
+    depends_on:
+    - consul
+    links:
+    - consul
+
+
+  replica_3:
+    image: demo
+    build: .
+
+    command: go run main.go
+    volumes:
+     - ./:/go/src/github.com/c-Brooks/go-2pc 
+    links:
+    - master
+    environment:
+    - master_addr=master
+    - CONSUL_ADDRESS=consul:8500
+
+    depends_on:
+    - consul
+    links:
+    - consul
+
+
+  replica_4:
+    image: demo
+    build: .
+
+    command: go run main.go
+    volumes:
+     - ./:/go/src/github.com/c-Brooks/go-2pc 
+    links:
+    - master
+    environment:
+    - master_addr=master
+    - CONSUL_ADDRESS=consul:8500
+
+    depends_on:
+    - consul
+    links:
+    - consul

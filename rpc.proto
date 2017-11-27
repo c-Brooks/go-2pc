@@ -1,0 +1,46 @@
+
+syntax = "proto3";
+
+package rpc;
+import "google/protobuf/timestamp.proto";
+
+
+service RPCService {
+
+    // RequestTransaction
+    // Sent by Master node to Slaves to prepare a transaction
+    // Slaves report the transaction status
+    rpc RequestTransactionTry      (stream XactReq)     returns (stream XactResp);
+    rpc RequestTransactionCommit   (CommitReq)          returns (CommitResp);
+    rpc HealthCheck                (HealthCheckReq)     returns (HealthCheckResp);
+}
+
+message XactReq {
+    string                    key       = 1;
+    string                    value     = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message XactResp {
+    bool                      commit_success = 1;
+    google.protobuf.Timestamp timestamp      = 2;
+}
+
+message CommitReq {
+    int32                     xid       = 1;
+    google.protobuf.Timestamp timestamp = 2;
+}
+
+message CommitResp {
+    int32                     xid       = 1;
+    google.protobuf.Timestamp timestamp = 2;
+}
+
+message HealthCheckReq {
+    google.protobuf.Timestamp timestamp = 1;
+}
+
+message HealthCheckResp {
+    google.protobuf.Timestamp timestamp   = 1;
+    int32                     status_code = 2;
+}
