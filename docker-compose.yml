@@ -4,8 +4,7 @@ services:
 
   # CONSUL
   # this service handles service discovery for peer-to-peer connections
-  # it's important to do it this way: this allows every node to start a gRPC server
-  # and become a master at a moment's notice
+  # TODO: allow for multiple consul nodes
   consul:
     container_name: consul
     image: consul:1.0.1
@@ -51,13 +50,13 @@ services:
       - ./:/go/src/github.com/c-Brooks/go-2pc
     links:
     - master
+    - consul
+
     environment:
     - master_addr=master
     - CONSUL_ADDRESS=consul:8500
 
     depends_on:
-    - consul
-    links:
     - consul
 
 
@@ -67,7 +66,7 @@ services:
 
     command: go run main.go
     volumes:
-    - ./:/go/src/github.com/c-Brooks/go-2pc 
+    - ./:/go/src/github.com/c-Brooks/go-2pc
     links:
     - master
     environment:
@@ -86,7 +85,7 @@ services:
 
     command: go run main.go
     volumes:
-     - ./:/go/src/github.com/c-Brooks/go-2pc 
+     - ./:/go/src/github.com/c-Brooks/go-2pc
     links:
     - master
     environment:
@@ -105,7 +104,7 @@ services:
 
     command: go run main.go
     volumes:
-     - ./:/go/src/github.com/c-Brooks/go-2pc 
+     - ./:/go/src/github.com/c-Brooks/go-2pc
     links:
     - master
     environment:
