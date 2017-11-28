@@ -79,11 +79,21 @@ services:
     - consul
 
 
+# This is the debug replica
   replica_3:
     image: demo
     build: .
 
-    command: go run main.go
+    command: dlv debug github.com/c-Brooks/go-2pc -l 0.0.0.0:2345 --headless=true --log=true -- server
+
+    security_opt:
+    - seccomp:unconfined
+
+    ports:
+    - "2345:2345"
+    expose:
+    - "2345"
+
     volumes:
      - ./:/go/src/github.com/c-Brooks/go-2pc
     links:

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
@@ -46,6 +47,7 @@ func (n *Node) RegisterService(isMaster bool) {
 	// embed consul.KV for future use
 	n.SDKV = kv
 	n.Client = consul
+	n.Clients = make(map[string]pb.RPCServiceClient)
 
 	logrus.Infoln("Successfully registered with Consul.")
 }
@@ -88,13 +90,14 @@ func (n *Node) SetupGRPCClient(name string, addr string) {
 	}
 	defer conn.Close()
 
+	logrus.Infof("yatta")
+
 	// Save the client in the local k/v store
 	n.Clients[name] = pb.NewRPCServiceClient(conn)
 
 	// r, err := n.Clients[name].SayHello(context.Background(), &hs.HelloRequest{Name: n.Name})
 
 	// todo: ping the new client
-
 }
 
 // RegisterGRPCService creates an agent and service entry in Consul
@@ -121,22 +124,33 @@ func (n *Node) RegisterGRPCService() error {
 
 // Healthcheck reports health of the cluster
 func (n *Node) Healthcheck() error {
-	_, err := n.Agent().Services()
+
+	logrus.Infof("pinging %d clients", len(n.Clients))
+
+	services, err := n.Agent().Services()
 	if err != nil {
 		return err
 	}
 
-	// ping each service
-	// for _, service := range as {
-	// 	logrus.Infoln(service.Service)
-	// 	logrus.Infoln(service.Address)
-	// 	logrus.Infoln(service.Port)
-	// }
+	logrus.Infof("services: %d", len(services))
+	for id, s := range services {
+		logrus.Infof("service %s", id)
+		addr := fmt.Sprintf("%s:%d", s.Address, s.Port)
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			return err
+		}
+
+		n.Clients[id] = pb.NewRPCServiceClient(conn)
+	}
 
 	hcr := &pb.HealthCheckReq{}
 	ctx := context.Background()
-	for _, c := range n.Clients {
+
+	for id, c := range n.Clients {
+		logrus.Infof("pinging host %s", id)
 		resp, err := c.HealthCheck(ctx, hcr)
+		logrus.Infof("pinged host %s: %s", id, resp.GetStatusCode())
 		// idk what sort of codes to expect
 		if err != nil || resp.GetStatusCode() == 500 {
 			return nil

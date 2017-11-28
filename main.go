@@ -83,7 +83,10 @@ type httpHandler struct {
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request, currentNode *cluster.Node) {
-	currentNode.Healthcheck()
+	err := currentNode.Healthcheck()
+	if err != nil {
+		logrus.Errorf("healthcheck failed: %v", err)
+	}
 	hostName, _ := os.Hostname()
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(hostName))
@@ -99,7 +102,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logrus.Infof("handling /healthz | %s", r.URL.Path)
 		handleHealthz(w, r, h.node)
 
-	default:
+	case "/api":
 		logrus.Infof("handling /something | %s", r.URL.Path)
 		switch r.Method {
 
@@ -131,6 +134,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+
 		case http.MethodGet:
 			t, err := parseBody(w, r)
 			key := t.GetKey()
@@ -145,6 +149,9 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(val))
 		}
 
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("not found"))
 	}
 }
 
