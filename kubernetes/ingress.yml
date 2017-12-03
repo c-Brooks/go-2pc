@@ -1,0 +1,164 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: consul
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    ingress.kubernetes.io/ssl-redirect: false
+spec:
+  rules:
+  - http:
+      paths:
+      # CONSUL UI
+      - path: /ui
+        backend:
+          serviceName: consul-demo-consul-ui # TODO
+          servicePort: 8500
+      # CONSUL API (also served through UI service)
+      - path: /v1
+        backend:
+          serviceName: consul-demo-consul-ui
+          servicePort: 8500
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-ingress-controller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx-ingress-controller
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: nginx-ingress-controller
+          image: gcr.io/google_containers/nginx-ingress-controller:0.8.3
+          imagePullPolicy: Always
+          # Builtin nginx healthz returns a 200
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 18080
+              scheme: HTTP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 18080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          args:
+            - /nginx-ingress-controller
+            - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
+            - --watch-namespace=$(POD_NAMESPACE)
+
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+---
+# Default HTTP Backend
+#
+# This is Google's supplied default image
+# It serves a 200 OK at /healthz and a 404 any other route
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: default-http-backend
+spec:
+  replicas: 1
+  selector:
+    app: default-http-backend
+  template:
+    metadata:
+      labels:
+        app: default-http-backend
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: default-http-backend
+        image: gcr.io/google_containers/defaultbackend:1.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: default-http-backend
+  labels:
+    app: default-http-backend
+spec:
+  type: NodePort
+  selector:
+    app: default-http-backend
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ingress-lb
+  labels:
+    app: nginx-ingress-lb
+
+  annotations:
+    # Save 1 network hop
+    service.beta.kubernetes.io/external-traffic: OnlyLocal
+
+spec:
+  type: LoadBalancer
+
+  loadBalancerIP: $(loadBalancerIP)
+
+  ports:
+    - port: 80
+      name: http
+    - port: 443
+      name: https
+  selector:
+    app: nginx-ingress-controller
